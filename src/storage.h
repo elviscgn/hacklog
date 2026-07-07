@@ -26,4 +26,8 @@ int hacklog_save(const char *profile_name, const HackLog *log);
 /* Check if a profile exists on disk */
 int hacklog_profile_exists(const char *profile_name);
 
+/* Create and seed the demo profile with realistic fabricated data.
+   Only creates if demo.db doesn't already exist. */
+void hacklog_seed_demo(void);
+
 #endif /* HACKLOG_STORAGE_H */

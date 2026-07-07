@@ -233,3 +233,74 @@ int hacklog_save(const char *profile_name, const HackLog *log) {
     fclose(f);
     return 0;
 }
+
+void hacklog_seed_demo(void) {
+    if (hacklog_profile_exists("demo")) return;
+
+    HackLog log;
+    hacklog_init(&log);
+    strncpy(log.profile_name, "demo", sizeof(log.profile_name) - 1);
+
+    /* Realistic fabricated entries with organic-looking data */
+    HackEntry *e;
+
+    e = &log.entries[log.count++];
+    strcpy(e->name, "MLH Global Hack Week");
+    strcpy(e->deadline, "2026-05-18");
+    e->status = STATUS_WON;
+    e->prize_amount = 500;
+    strcpy(e->prize_currency, "USD");
+    e->prize_zar = 9250.0;
+    strcpy(e->notes, "Built a climate dashboard with React");
+
+    e = &log.entries[log.count++];
+    strcpy(e->name, "Devpost AI Horizons");
+    strcpy(e->deadline, "2026-06-02");
+    e->status = STATUS_WON;
+    e->prize_amount = 2500;
+    strcpy(e->prize_currency, "USD");
+    e->prize_zar = 46250.0;
+    strcpy(e->notes, "RAG pipeline with local models, team of 3");
+
+    e = &log.entries[log.count++];
+    strcpy(e->name, "ETHGlobal Cape Town");
+    strcpy(e->deadline, "2026-06-15");
+    e->status = STATUS_LOST;
+    strcpy(e->notes, "DeFi lending protocol, ran out of time on the frontend");
+
+    e = &log.entries[log.count++];
+    strcpy(e->name, "Google Solution Challenge");
+    strcpy(e->deadline, "2026-06-28");
+    e->status = STATUS_WON;
+    e->prize_amount = 1000;
+    strcpy(e->prize_currency, "USD");
+    e->prize_zar = 18500.0;
+    strcpy(e->notes, "Water quality monitoring IoT system");
+
+    e = &log.entries[log.count++];
+    strcpy(e->name, "TreeHacks Stanford");
+    strcpy(e->deadline, "2026-07-05");
+    e->status = STATUS_LOST;
+    strcpy(e->notes, "Mental health chatbot, judging was tough");
+
+    e = &log.entries[log.count++];
+    strcpy(e->name, "Kaggle BIPOC in ML");
+    strcpy(e->deadline, "2026-07-20");
+    e->status = STATUS_SUBMITTED;
+    strcpy(e->notes, "Computer vision model for crop disease detection");
+
+    e = &log.entries[log.count++];
+    strcpy(e->name, "HackZA National Finals");
+    strcpy(e->deadline, "2026-08-01");
+    e->status = STATUS_ACTIVE;
+    strcpy(e->notes, "Government services chatbot, partnered with Praekelt");
+
+    e = &log.entries[log.count++];
+    strcpy(e->name, "Junction Helsinki");
+    strcpy(e->deadline, "2026-08-22");
+    e->status = STATUS_APPLIED;
+    strcpy(e->notes, "Waiting for travel grant confirmation");
+
+    sort_entries_by_deadline(&log);
+    hacklog_save("demo", &log);
+}

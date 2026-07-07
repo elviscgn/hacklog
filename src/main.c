@@ -35,6 +35,9 @@ int main(int argc, char *argv[]) {
     /* Initialize hacklog directory structure */
     hacklog_dir_init();
 
+    /* Seed demo profile with fabricated data if it doesn't exist */
+    hacklog_seed_demo();
+
     /* Parse --profile flag */
     char profile_name[64] = "default";
     for (int i = 1; i < argc - 1; i++) {
