@@ -53,3 +53,14 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Build artifacts
+build/
+hacklog
+test_runner
+
+# macOS
+.DS_Store
+
+# Spec file (private)
+b.md
