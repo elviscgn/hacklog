@@ -1,11 +1,7 @@
 #include "banner.h"
 #include <string.h>
 
-/*
- * Block-letter "hacklog" using █▓░ characters.
- * Baked in as a string constant — no external figlet dependency.
- */
-
+/* clang-format off */
 static const char *banner_big =
     "                      _       __                \n"
     "  /\\  /\\  __ _   ___ | | __  / /    ___    __ _ \n"
@@ -13,6 +9,7 @@ static const char *banner_big =
     "/ __  / | (_| || (__ |   < / /___ | (_) || (_| |\n"
     "\\/ /_/   \\__,_| \\___||_|\\_\\\\\\\\____/  \\___/  \\__, |\n"
     "                                          |___/ \n";
+/* clang-format on */
 
 static const char *banner_small = "[ hacklog ]";
 
