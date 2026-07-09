@@ -1,17 +1,17 @@
 # hacklog
 
-Terminal-native hackathon/project logbook. Track what you're in, what's due when, and your win/loss record — all from the command line.
+Terminal-native hackathon and project logbook. Track what you're in, what's due when, and your win/loss record - all from the command line.
 
 Built in C with ncurses. No network calls, no databases, no dependencies beyond libc and ncurses.
 
 ## Features
 
-- **TUI dashboard** — launch with `hack` for an interactive view with ASCII banner, stats, and entry list
-- **Slash commands** — type `/add`, `/win`, `/lose` inside the TUI, same parser as shell commands
-- **Calendar view** — month grid showing deadlines with urgency coloring and per-entry identity colors
-- **Currency conversion** — static ZAR conversion with manually-maintained rates
-- **Profiles** — switch to a decoy dataset for screenshots (`--profile demo`)
-- **Flat-file storage** — human-readable TSV files in `~/.hacklog/`
+- **TUI dashboard**: launch with `hack` for an interactive view with ASCII banner, stats, and entry list
+- **Slash commands**: type `/add`, `/win`, `/lose` inside the TUI, same parser as shell commands
+- **Calendar view**: month grid showing deadlines with urgency coloring and per-entry identity colors
+- **Currency conversion**: static ZAR conversion with manually-maintained rates
+- **Profiles**: switch to a decoy dataset for screenshots (`--profile demo`)
+- **Flat-file storage**: human-readable TSV files in `~/.hacklog/`
 
 ## Build
 
@@ -138,7 +138,7 @@ EUR=19.80
 
 ZAR is the base currency. Update rates with `hack rate USD 19.00`.
 
-Converted values are frozen at time of entry — updating a rate won't change past prizes.
+Converted values are frozen at time of entry; updating a rate won't change past prizes.
 
 ## Profiles
 
