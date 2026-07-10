@@ -131,16 +131,6 @@ EUR=19.80
 ZAR is the base currency. Update rates with `hack rate USD 19.00`.
 
 Converted values are frozen at time of entry; updating a rate won't change past prizes.
-
-## Data format
-
-Entries are stored as tab-separated values in `~/.hacklog/profiles/<name>.db`. The format is human-editable:
-
-```
-# name	deadline	status	prize_amount	prize_currency	prize_zar	notes
-HackMIT	2026-09-15	won	2500.00	USD	46250.00	team of 4, used Go
-```
-
 ## License
 
 MIT
