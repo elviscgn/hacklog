@@ -107,30 +107,6 @@ All shell commands work as slash commands with `/`:
 | `lost`      | Didn't win |
 | `rejected`  | Application declined |
 | `cancelled` | You decided to bail |
-
-### Win rate
-
-```
-win_rate = won / (won + lost)
-```
-
-Only `won` and `lost` count. Everything else is excluded.
-
-## Currency
-
-Prizes are parsed from symbols (`$`, `R`, `£`, `€`) or 3-letter codes (`USD`, `ZAR`, `GBP`, `EUR`).
-
-Conversion rates are static and stored in `~/.hacklog/config`:
-
-```
-USD=18.50
-GBP=23.10
-EUR=19.80
-```
-
-ZAR is the base currency. Update rates with `hack rate USD 19.00`.
-
-Converted values are frozen at time of entry; updating a rate won't change past prizes.
 ## License
 
 MIT
