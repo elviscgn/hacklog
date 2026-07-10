@@ -9,7 +9,7 @@ terminal-native hackathon and project logbook. track what you're in, what's due,
 - **tui dashboard**: type `hack` to open the terminal ui with a nice banner, quick stats, and list
 - **slash commands**: `/add`, `/win`, `/lose` inside the tui (uses the exact same parser as the shell)
 - **calendar view**: month grid view showing deadlines with urgency colors and legend
-- **currency conversion**: local ZAR conversion with static rates in your config
+- **currency conversion**: local south african rand or dollars conversion with static rates in your config
 - **flat-file storage**: just plain tsv files under `~/.hacklog/` - super easy to edit by hand
 
 > [!NOTE]
