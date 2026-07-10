@@ -2,47 +2,47 @@
 
 [![CI](https://github.com/elviscgn/hacklog/actions/workflows/ci.yml/badge.svg)](https://github.com/elviscgn/hacklog/actions/workflows/ci.yml)
 
-Terminal-native hackathon and project logbook. Track what you're in, what's due when, and your win/loss record - all from the command line.
+terminal-native hackathon and project logbook. track what you're in, what's due, and your win/loss record without leaving the terminal.
 
-## Features
+## features
 
-- **TUI dashboard**: launch with `hack` for an interactive view with ASCII banner, stats, and entry list
-- **Slash commands**: type `/add`, `/win`, `/lose` inside the TUI, same parser as shell commands
-- **Calendar view**: month grid showing deadlines with urgency coloring and per-entry identity colors
-- **Currency conversion**: static ZAR conversion with manually-maintained rates
-- **Flat-file storage**: human-readable TSV files in `~/.hacklog/`
+- **tui dashboard**: type `hack` to open the terminal ui with a nice banner, quick stats, and list
+- **slash commands**: `/add`, `/win`, `/lose` inside the tui (uses the exact same parser as the shell)
+- **calendar view**: month grid view showing deadlines with urgency colors and legend
+- **currency conversion**: local ZAR conversion with static rates in your config
+- **flat-file storage**: just plain tsv files under `~/.hacklog/` - super easy to edit by hand
 
 > [!NOTE]
-> All currency conversions are handled completely locally using static rates configured in your config file. There are no live network calls or tracking.
+> currency conversions are completely offline using rates in your config file. no api calls, no tracking.
 
-## Build
-
-```sh
-make          # build the binary
-make test     # run the test suite
-make install  # install to ~/.local/bin or /usr/local/bin
-make clean    # remove build artifacts
-```
-
-Requires: gcc (C11), ncurses, make.
-
-On macOS ncurses is included with the system. On Ubuntu/Debian: `sudo apt install libncurses-dev`.
-
-## Usage
-
-### TUI (default)
+## build
 
 ```sh
-hack                    # launch dashboard
+make          # build it
+make test     # run tests
+make install  # put it in your path
+make clean    # clean up build files
 ```
 
-Inside the TUI:
-- `j`/`k` or arrow keys to navigate the entry list
-- `/` to open the command line
-- `Esc` to cancel a command
-- `q` to quit
+needs: gcc (c11), ncurses, make.
 
-### Shell commands
+on mac, ncurses is already installed. on linux: `sudo apt install libncurses-dev`.
+
+## usage
+
+### tui (default)
+
+```sh
+hack
+```
+
+inside the tui:
+- `j`/`k` or arrow keys to move around
+- `/` to type a command
+- `Esc` to cancel
+- `q` to exit
+
+### shell mode
 
 ```sh
 hack add "HackMIT" --deadline 2026-09-15
@@ -51,9 +51,9 @@ hack list
 hack cal
 ```
 
-### In-TUI slash commands
+### in-tui commands
 
-All shell commands work as slash commands with `/`:
+just prefix with `/`:
 
 ```
 /add "HackMIT" --deadline 2026-09-15
@@ -70,22 +70,22 @@ All shell commands work as slash commands with `/`:
 /cal
 ```
 
-## Command reference
+## command reference
 
 | Command | Usage | Description |
 |---------|-------|-------------|
-| `add`   | `hack add "name" --deadline YYYY-MM-DD` | Add entry (defaults to `applied`) |
-| `win`   | `hack win "name" [--prize $2500]` | Mark as won with optional prize |
-| `lose`  | `hack lose "name"` | Mark as lost |
-| `status`| `hack status "name" <status>` | Set status directly |
-| `edit`  | `hack edit "name" [flags]` | Edit entry fields |
-| `delete`| `hack delete "name"` | Delete (requires confirmation) |
-| `undo`  | `hack undo` | Revert last action |
-| `list`  | `hack list` | Print entries to stdout |
-| `rate`  | `hack rate USD 18.50` | Update currency rate |
-| `cal`   | `hack cal` | Print calendar |
+| `add`   | `hack add "name" --deadline YYYY-MM-DD` | create entry (defaults to `applied`) |
+| `win`   | `hack win "name" [--prize $2500]` | mark as won with optional prize |
+| `lose`  | `hack lose "name"` | mark as lost |
+| `status`| `hack status "name" <status>` | change status directly |
+| `edit`  | `hack edit "name" [flags]` | edit fields of an entry |
+| `delete`| `hack delete "name"` | delete entry (requires y/n confirm) |
+| `undo`  | `hack undo` | revert last action |
+| `list`  | `hack list` | print all entries to stdout |
+| `rate`  | `hack rate USD 18.50` | update currency conversion rate |
+| `cal`   | `hack cal` | show calendar view |
 
-### Aliases
+### aliases
 
 | Alias | Expands to |
 |-------|-----------|
@@ -96,17 +96,18 @@ All shell commands work as slash commands with `/`:
 | `/e`  | `/edit`   |
 | `/s`  | `/status` |
 
-### Status values
+### status values
 
 | Status      | Meaning |
 |-------------|---------|
-| `applied`   | Waiting to hear back |
-| `active`    | Currently competing |
-| `submitted` | Done, awaiting results |
-| `won`       | Won the hackathon |
-| `lost`      | Didn't win |
-| `rejected`  | Application declined |
-| `cancelled` | You decided to bail |
-## License
+| `applied`   | waiting to hear back |
+| `active`    | currently competing |
+| `submitted` | done, waiting for results |
+| `won`       | resolved, you won |
+| `lost`      | competed but didn't win |
+| `rejected`  | application was declined |
+| `cancelled` | you decided to bail |
 
-MIT
+## license
+
+mit
