@@ -9,11 +9,11 @@ terminal-native hackathon and project logbook. track what you're in, what's due,
 - **tui dashboard**: type `hack` to open the terminal ui with a nice banner, quick stats, and list
 - **slash commands**: `/add`, `/win`, `/lose` inside the tui (uses the exact same parser as the shell)
 - **calendar view**: month grid view showing deadlines with urgency colors and legend
-- **currency conversion**: local south african rand or dollars conversion with static rates in your config
+- **deadlines and notes**: track project deadlines, status transitions, and custom project details/notes
 - **flat-file storage**: just plain tsv files under `~/.hacklog/` - super easy to edit by hand
 
 > [!NOTE]
-> currency conversions are completely offline using rates in your config file. no api calls, no tracking.
+> hacklog runs completely offline with zero network dependencies or external databases.
 
 ## build
 
