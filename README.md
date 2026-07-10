@@ -1,8 +1,8 @@
 # hacklog
 
-Terminal-native hackathon and project logbook. Track what you're in, what's due when, and your win/loss record - all from the command line.
+[![CI](https://github.com/elviscgn/hacklog/actions/workflows/ci.yml/badge.svg)](https://github.com/elviscgn/hacklog/actions/workflows/ci.yml)
 
-Built in C with ncurses. No network calls, no databases, no dependencies beyond libc and ncurses.
+Terminal-native hackathon and project logbook. Track what you're in, what's due when, and your win/loss record - all from the command line.
 
 ## Features
 
@@ -10,8 +10,10 @@ Built in C with ncurses. No network calls, no databases, no dependencies beyond 
 - **Slash commands**: type `/add`, `/win`, `/lose` inside the TUI, same parser as shell commands
 - **Calendar view**: month grid showing deadlines with urgency coloring and per-entry identity colors
 - **Currency conversion**: static ZAR conversion with manually-maintained rates
-- **Profiles**: switch to a decoy dataset for screenshots (`--profile demo`)
 - **Flat-file storage**: human-readable TSV files in `~/.hacklog/`
+
+> [!NOTE]
+> All currency conversions are handled completely locally using static rates configured in your config file. There are no live network calls or tracking.
 
 ## Build
 
@@ -32,7 +34,6 @@ On macOS ncurses is included with the system. On Ubuntu/Debian: `sudo apt instal
 
 ```sh
 hack                    # launch dashboard
-hack --profile demo     # launch with demo data
 ```
 
 Inside the TUI:
@@ -45,17 +46,9 @@ Inside the TUI:
 
 ```sh
 hack add "HackMIT" --deadline 2026-09-15
-hack add "TreeHacks" --deadline 2026-10-01 --notes "team of 4"
 hack win "HackMIT" --prize $2500
-hack lose "TreeHacks"
-hack status "HackMIT" active
-hack edit "HackMIT" --deadline 2026-09-20 --notes "updated plan"
-hack delete "HackMIT"
-hack undo
 hack list
-hack rate USD 18.50
 hack cal
-hack --profile demo list
 ```
 
 ### In-TUI slash commands
@@ -75,7 +68,6 @@ All shell commands work as slash commands with `/`:
 /list
 /rate EUR 19.80
 /cal
-/profile demo
 ```
 
 ## Command reference
@@ -139,24 +131,6 @@ EUR=19.80
 ZAR is the base currency. Update rates with `hack rate USD 19.00`.
 
 Converted values are frozen at time of entry; updating a rate won't change past prizes.
-
-## Profiles
-
-Profiles let you keep separate datasets. The main use case is switching to a fake dataset before taking screenshots so competitors can't see your real entries.
-
-```sh
-hack --profile demo     # launch with demo data
-```
-
-Inside the TUI:
-```
-/profile demo           # switch mid-session
-/profile default        # switch back
-```
-
-The `demo` profile ships pre-seeded with realistic fabricated data.
-
-All profiles live as `.db` files under `~/.hacklog/profiles/`.
 
 ## Data format
 
