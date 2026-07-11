@@ -1,6 +1,6 @@
 # hacklog
 
-[![CI](https://github.com/elviscgn/hacklog/actions/workflows/ci.yml/badge.svg)](https://github.com/elviscgn/hacklog/actions/workflows/ci.yml)
+[![CI](https://github.com/elviscgn/hacklog/actions/workflows/ci.yml/badge.svg)](https://github.com/elviscgn/hacklog/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 terminal-native hackathon and project logbook. track what you're in, what's due, and your win/loss record without leaving the terminal.
 
