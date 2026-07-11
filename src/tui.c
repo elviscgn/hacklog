@@ -79,6 +79,8 @@ typedef struct {
     int         form_step;      /* 0: name, 1: deadline */
     char        form_name[128];
     char        form_deadline[64];
+    int         form_is_edit;
+    char        form_orig_name[128];
 
     /* Action menu state */
     int         action_menu_active;
@@ -262,21 +264,14 @@ static int draw_stats(TuiState *st, int start_row) {
     mvprintw(row, x + 13, "%s", wr_str);
     attroff(COLOR_PAIR(CP_ACCENT));
 
-    x = (cols / 4) + 2;
-    attron(COLOR_PAIR(CP_URGENT_YELLOW) | A_BOLD);
-    mvprintw(row, x, " TOTAL WON:");
-    attroff(A_BOLD);
-    mvprintw(row, x + 14, "%s", total_str);
-    attroff(COLOR_PAIR(CP_URGENT_YELLOW));
-
-    x = (cols / 2) + 2;
+    x = (cols / 3) + 2;
     attron(COLOR_PAIR(CP_URGENT_RED) | A_BOLD);
     mvprintw(row, x, " STREAK:");
     attroff(A_BOLD);
     mvprintw(row, x + 11, "%s", streak_str);
     attroff(COLOR_PAIR(CP_URGENT_RED));
 
-    x = (3 * cols / 4) + 2;
+    x = (2 * cols / 3) + 2;
     attron(COLOR_PAIR(CP_ACTIVE_STATUS) | A_BOLD);
     mvprintw(row, x, " IN PROGRESS:");
     attroff(A_BOLD);
@@ -302,17 +297,12 @@ static void draw_entry_list(TuiState *st, int start_row) {
     int col_deadline = 4;
     int col_status   = 16;
     int col_name     = 28;
-    int col_prize    = cols - 20;
-    if (col_prize < col_name + 20) col_prize = col_name + 20;
 
     /* Header row */
     attron(A_BOLD | A_UNDERLINE | COLOR_PAIR(CP_ACCENT));
     mvprintw(start_row, col_deadline, "DEADLINE");
     mvprintw(start_row, col_status, "STATUS");
     mvprintw(start_row, col_name, "NAME");
-    if (col_prize < cols - 5) {
-        mvprintw(start_row, col_prize, "PRIZE");
-    }
     attroff(A_BOLD | A_UNDERLINE | COLOR_PAIR(CP_ACCENT));
 
     int row = start_row + 2; /* extra spacing after header */
@@ -374,7 +364,7 @@ static void draw_entry_list(TuiState *st, int start_row) {
         }
 
         /* Name */
-        int max_name = col_prize - col_name - 2;
+        int max_name = cols - col_name - 2;
         if (max_name > MAX_NAME_LEN) max_name = MAX_NAME_LEN;
         if (max_name < 10) max_name = 10;
         char name_trunc[MAX_NAME_LEN];
@@ -385,13 +375,6 @@ static void draw_entry_list(TuiState *st, int start_row) {
             name_trunc[max_name - 2] = '.';
         }
         mvprintw(row + i, col_name, "%s", name_trunc);
-
-        /* Prize (if any and fits) */
-        if (col_prize < cols - 5 && e->prize_zar > 0) {
-            char prize_buf[32];
-            format_zar(e->prize_zar, prize_buf, sizeof(prize_buf));
-            mvprintw(row + i, col_prize, "%s", prize_buf);
-        }
 
         if (is_selected) {
             attroff(COLOR_PAIR(CP_ACCENT));
@@ -548,10 +531,12 @@ static void draw_form(TuiState *st) {
     attron(COLOR_PAIR(CP_CMDLINE));
     mvhline(row, 0, ' ', cols);
 
+    const char *prefix = st->form_is_edit ? "Edit Wizard" : "Wizard";
+
     if (st->form_step == 0) {
-        mvprintw(row, 2, "Wizard - Name: %s_", st->cmd_buf);
+        mvprintw(row, 2, "%s - Name: %s_", prefix, st->cmd_buf);
     } else if (st->form_step == 1) {
-        mvprintw(row, 2, "Wizard - Deadline (YYYY-MM-DD): %s_", st->cmd_buf);
+        mvprintw(row, 2, "%s - Deadline (YYYY-MM-DD): %s_", prefix, st->cmd_buf);
     }
     attroff(COLOR_PAIR(CP_CMDLINE));
 
@@ -942,11 +927,18 @@ int tui_run(const char *profile_name) {
                 } else if (st.form_step == 1) {
                     strncpy(st.form_deadline, st.cmd_buf, sizeof(st.form_deadline) - 1);
                     char full_cmd[512];
-                    snprintf(full_cmd, sizeof(full_cmd), "add \"%s\" --deadline %s", st.form_name, st.form_deadline);
+                    if (st.form_is_edit) {
+                        snprintf(full_cmd, sizeof(full_cmd), "edit \"%s\" --name \"%s\" --deadline %s", 
+                                 st.form_orig_name, st.form_name, st.form_deadline);
+                    } else {
+                        snprintf(full_cmd, sizeof(full_cmd), "add \"%s\" --deadline %s", 
+                                 st.form_name, st.form_deadline);
+                    }
                     strncpy(st.cmd_buf, full_cmd, sizeof(st.cmd_buf)-1);
                     st.cmd_len = strlen(st.cmd_buf);
                     execute_command(&st);
                     st.form_active = 0;
+                    st.form_is_edit = 0;
                 }
             } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
                 if (st.cmd_len > 0) st.cmd_buf[--st.cmd_len] = '\0';
@@ -973,9 +965,12 @@ int tui_run(const char *profile_name) {
                     st.cmd_len = strlen(st.cmd_buf);
                     execute_command(&st);
                 } else if (st.action_selected == 2) {
-                    snprintf(st.cmd_buf, sizeof(st.cmd_buf), "edit \"%s\" --", e->name);
+                    st.form_active = 1;
+                    st.form_is_edit = 1;
+                    st.form_step = 0;
+                    strncpy(st.form_orig_name, e->name, sizeof(st.form_orig_name) - 1);
+                    strncpy(st.cmd_buf, e->name, sizeof(st.cmd_buf) - 1);
                     st.cmd_len = strlen(st.cmd_buf);
-                    st.cmd_active = 1;
                 } else if (st.action_selected == 3) {
                     snprintf(st.cmd_buf, sizeof(st.cmd_buf), "delete \"%s\"", e->name);
                     st.cmd_len = strlen(st.cmd_buf);
