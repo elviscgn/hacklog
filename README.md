@@ -46,7 +46,7 @@ inside the tui:
 
 ```sh
 hack add "HackMIT" --deadline 2026-09-15
-hack win "HackMIT" --prize $2500
+hack win "HackMIT" --prize R45000
 hack list
 hack cal
 ```
@@ -57,8 +57,8 @@ just prefix with `/`:
 
 ```
 /add "HackMIT" --deadline 2026-09-15
-/win "HackMIT" --prize $2500
-/w "HackMIT" --prize $2500     (alias)
+/win "HackMIT" --prize R45000
+/w "HackMIT" --prize R45000     (alias)
 /lose "HackMIT"
 /l "HackMIT"                   (alias)
 /status "HackMIT" active
@@ -66,7 +66,7 @@ just prefix with `/`:
 /delete "HackMIT"
 /undo
 /list
-/rate EUR 19.80
+/rate USD 18.50
 /cal
 ```
 
@@ -75,7 +75,7 @@ just prefix with `/`:
 | Command | Usage | Description |
 |---------|-------|-------------|
 | `add`   | `hack add "name" --deadline YYYY-MM-DD` | create entry (defaults to `applied`) |
-| `win`   | `hack win "name" [--prize $2500]` | mark as won with optional prize |
+| `win`   | `hack win "name" [--prize R45000]` | mark as won with optional prize |
 | `lose`  | `hack lose "name"` | mark as lost |
 | `status`| `hack status "name" <status>` | change status directly |
 | `edit`  | `hack edit "name" [flags]` | edit fields of an entry |
