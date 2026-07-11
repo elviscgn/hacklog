@@ -448,6 +448,7 @@ static const CmdDef known_commands[] = {
     {"undo", "Undo last action"},
     {"list", "List all entries"},
     {"rate", "Set currency rate"},
+    {"profile", "Switch to a different scenario/profile"},
     {"cal", "Show calendar view"},
 };
 #define NUM_CMDS (sizeof(known_commands) / sizeof(known_commands[0]))
