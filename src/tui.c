@@ -62,6 +62,7 @@ typedef struct {
     int         cmd_active;     /* 1 when command line is open */
     char        cmd_buf[512];   /* input buffer */
     int         cmd_len;        /* current input length */
+    int         ac_selected;    /* autocomplete selected index */
 
     /* Message display */
     char        message[512];   /* status/error message */
@@ -72,6 +73,16 @@ typedef struct {
     int         term_cols;
     int         list_start_row; /* where entry list begins */
     int         list_height;    /* visible entry rows */
+
+    /* Form state */
+    int         form_active;
+    int         form_step;      /* 0: name, 1: deadline */
+    char        form_name[128];
+    char        form_deadline[64];
+
+    /* Action menu state */
+    int         action_menu_active;
+    int         action_selected;
 
     /* Calendar mode */
     int         in_calendar;
@@ -93,8 +104,12 @@ static void tui_load_data(TuiState *st) {
 
 /* ── drawing helpers ──────────────────────────────────────── */
 
-static void draw_hline(int row, int col, int width) {
-    mvhline(row, col, ACS_HLINE, width);
+static void draw_divider(int row, int cols) {
+    attron(COLOR_PAIR(CP_DIMMED));
+    mvaddch(row, 0, ACS_LTEE);
+    mvhline(row, 1, ACS_HLINE, cols - 2);
+    mvaddch(row, cols - 1, ACS_RTEE);
+    attroff(COLOR_PAIR(CP_DIMMED));
 }
 
 /* Format a number with thousands separators */
@@ -142,6 +157,19 @@ static int status_color(HackStatus s) {
     }
 }
 
+static const char *status_icon(HackStatus s) {
+    switch (s) {
+        case STATUS_WON:       return " won";
+        case STATUS_LOST:      return " lost";
+        case STATUS_REJECTED:  return " rejected";
+        case STATUS_CANCELLED: return " cancelled";
+        case STATUS_APPLIED:   return " applied";
+        case STATUS_ACTIVE:    return " active";
+        case STATUS_SUBMITTED: return " submitted";
+        default:               return " unknown";
+    }
+}
+
 /* Get color pair for deadline urgency */
 static int deadline_color(const char *deadline) {
     int days = days_until_deadline(deadline);
@@ -154,7 +182,7 @@ static int deadline_color(const char *deadline) {
 /* ── banner drawing ───────────────────────────────────────── */
 
 static int draw_banner(TuiState *st) {
-    int row = 0;
+    int row = 1;
     int cols = st->term_cols;
 
     if (cols >= banner_width() + 4) {
@@ -169,7 +197,7 @@ static int draw_banner(TuiState *st) {
 
             /* Center the banner */
             int x = (cols - banner_width()) / 2;
-            if (x < 0) x = 0;
+            if (x < 1) x = 1;
 
             mvaddnstr(row, x, line, len);
             row++;
@@ -195,7 +223,7 @@ static int draw_stats(TuiState *st, int start_row) {
     int row = start_row;
     int cols = st->term_cols;
 
-    draw_hline(row, 0, cols);
+    draw_divider(row, cols);
     row++;
 
     /* Win rate */
@@ -226,36 +254,37 @@ static int draw_stats(TuiState *st, int start_row) {
         }
     }
 
-    /* Draw stats in a row */
-    int x = 2;
+    int x = 4;
 
-    attron(COLOR_PAIR(CP_HEADER) | A_BOLD);
-    mvprintw(row, x, "Win Rate: ");
+    attron(COLOR_PAIR(CP_ACCENT) | A_BOLD);
+    mvprintw(row, x, " WIN RATE:");
     attroff(A_BOLD);
-    printw("%s", wr_str);
+    mvprintw(row, x + 13, "%s", wr_str);
+    attroff(COLOR_PAIR(CP_ACCENT));
 
-    x = cols / 4;
-    attron(A_BOLD);
-    mvprintw(row, x, "Total Won: ");
+    x = (cols / 4) + 2;
+    attron(COLOR_PAIR(CP_URGENT_YELLOW) | A_BOLD);
+    mvprintw(row, x, " TOTAL WON:");
     attroff(A_BOLD);
-    printw("%s", total_str);
+    mvprintw(row, x + 14, "%s", total_str);
+    attroff(COLOR_PAIR(CP_URGENT_YELLOW));
 
-    x = cols / 2;
-    attron(A_BOLD);
-    mvprintw(row, x, "Streak: ");
+    x = (cols / 2) + 2;
+    attron(COLOR_PAIR(CP_URGENT_RED) | A_BOLD);
+    mvprintw(row, x, " STREAK:");
     attroff(A_BOLD);
-    printw("%s", streak_str);
+    mvprintw(row, x + 11, "%s", streak_str);
+    attroff(COLOR_PAIR(CP_URGENT_RED));
 
-    x = 3 * cols / 4;
-    attron(A_BOLD);
-    mvprintw(row, x, "In Progress: ");
+    x = (3 * cols / 4) + 2;
+    attron(COLOR_PAIR(CP_ACTIVE_STATUS) | A_BOLD);
+    mvprintw(row, x, " IN PROGRESS:");
     attroff(A_BOLD);
-    printw("%d", n_active);
-
-    attroff(COLOR_PAIR(CP_HEADER));
+    mvprintw(row, x + 16, "%d", n_active);
+    attroff(COLOR_PAIR(CP_ACTIVE_STATUS));
 
     row++;
-    draw_hline(row, 0, cols);
+    draw_divider(row, cols);
     row++;
 
     return row;
@@ -265,28 +294,28 @@ static int draw_stats(TuiState *st, int start_row) {
 
 static void draw_entry_list(TuiState *st, int start_row) {
     st->list_start_row = start_row;
-    st->list_height = st->term_rows - start_row - 2; /* leave room for command line */
+    st->list_height = st->term_rows - start_row - 4; /* room for cmdline + borders */
 
     int cols = st->term_cols;
 
     /* Column widths */
-    int col_deadline = 2;
-    int col_status   = 14;
-    int col_name     = 26;
+    int col_deadline = 4;
+    int col_status   = 16;
+    int col_name     = 28;
     int col_prize    = cols - 20;
     if (col_prize < col_name + 20) col_prize = col_name + 20;
 
     /* Header row */
-    attron(A_BOLD | COLOR_PAIR(CP_ACCENT));
+    attron(A_BOLD | A_UNDERLINE | COLOR_PAIR(CP_ACCENT));
     mvprintw(start_row, col_deadline, "DEADLINE");
     mvprintw(start_row, col_status, "STATUS");
     mvprintw(start_row, col_name, "NAME");
     if (col_prize < cols - 5) {
         mvprintw(start_row, col_prize, "PRIZE");
     }
-    attroff(A_BOLD | COLOR_PAIR(CP_ACCENT));
+    attroff(A_BOLD | A_UNDERLINE | COLOR_PAIR(CP_ACCENT));
 
-    int row = start_row + 1;
+    int row = start_row + 2; /* extra spacing after header */
 
     if (st->log.count == 0) {
         /* Empty state */
@@ -312,18 +341,22 @@ static void draw_entry_list(TuiState *st, int start_row) {
         const HackEntry *e = &st->log.entries[entry_idx];
         int is_selected = (entry_idx == st->selected);
 
-        if (is_selected) {
-            attron(COLOR_PAIR(CP_ACCENT) | A_REVERSE);
-        }
+        /* Clear the line (except borders) */
+        move(row + i, 1);
+        for(int x=1; x<cols-1; x++) addch(' ');
 
-        /* Clear the line */
-        move(row + i, 0);
-        clrtoeol();
+        if (is_selected) {
+            attron(COLOR_PAIR(CP_ACCENT) | A_BOLD);
+            mvprintw(row + i, 2, ">");
+            attroff(A_BOLD);
+        }
 
         /* Deadline with urgency color */
         if (!is_selected) {
             int dl_color = deadline_color(e->deadline);
             if (dl_color != CP_NORMAL) attron(COLOR_PAIR(dl_color));
+        } else {
+            attron(COLOR_PAIR(CP_ACCENT));
         }
         mvprintw(row + i, col_deadline, "%-10s", e->deadline);
         if (!is_selected) {
@@ -335,7 +368,7 @@ static void draw_entry_list(TuiState *st, int start_row) {
         if (!is_selected) {
             attron(COLOR_PAIR(status_color(e->status)));
         }
-        mvprintw(row + i, col_status, "%-10s", status_to_str(e->status));
+        mvprintw(row + i, col_status, "%s", status_icon(e->status));
         if (!is_selected) {
             attroff(COLOR_PAIR(status_color(e->status)));
         }
@@ -361,7 +394,7 @@ static void draw_entry_list(TuiState *st, int start_row) {
         }
 
         if (is_selected) {
-            attroff(COLOR_PAIR(CP_ACCENT) | A_REVERSE);
+            attroff(COLOR_PAIR(CP_ACCENT));
         }
     }
 
@@ -369,12 +402,12 @@ static void draw_entry_list(TuiState *st, int start_row) {
     int remaining = st->log.count - st->scroll_offset - visible;
     if (remaining > 0) {
         attron(COLOR_PAIR(CP_HINT));
-        mvprintw(row + visible, 2, "... %d more below", remaining);
+        mvprintw(row + visible, col_deadline, "... %d more below", remaining);
         attroff(COLOR_PAIR(CP_HINT));
     }
     if (st->scroll_offset > 0) {
         attron(COLOR_PAIR(CP_HINT));
-        mvprintw(start_row, cols - 16, "%d above ...", st->scroll_offset);
+        mvprintw(start_row, cols - 20, "%d above ...", st->scroll_offset);
         attroff(COLOR_PAIR(CP_HINT));
     }
 }
@@ -382,42 +415,190 @@ static void draw_entry_list(TuiState *st, int start_row) {
 /* ── command line ─────────────────────────────────────────── */
 
 static void draw_cmdline(TuiState *st) {
-    int row = st->term_rows - 1;
-    move(row, 0);
-    clrtoeol();
+    int row = st->term_rows - 2;
+    int cols = st->term_cols;
+
+    draw_divider(row - 1, cols);
+
+    move(row, 1);
+    for(int x=1; x<cols-1; x++) addch(' ');
 
     if (st->cmd_active) {
         attron(COLOR_PAIR(CP_ACCENT) | A_BOLD);
-        mvaddch(row, 0, '/');
+        mvprintw(row, 2, ">_ ");
         attroff(A_BOLD);
-        mvprintw(row, 1, "%s", st->cmd_buf);
+        mvprintw(row, 5, "%s", st->cmd_buf);
         attroff(COLOR_PAIR(CP_ACCENT));
         /* Position cursor */
-        move(row, 1 + st->cmd_len);
+        move(row, 5 + st->cmd_len);
         curs_set(1);
     } else if (st->message[0]) {
         int cp = st->msg_is_error ? CP_ERROR : CP_ACCENT;
-        attron(COLOR_PAIR(cp));
-        mvprintw(row, 1, "%s", st->message);
+        attron(COLOR_PAIR(cp) | A_BOLD);
+        mvprintw(row, 2, ">> ");
+        attroff(A_BOLD);
+        mvprintw(row, 5, "%s", st->message);
         attroff(COLOR_PAIR(cp));
         curs_set(0);
     } else {
         attron(COLOR_PAIR(CP_HINT) | A_DIM);
-        mvprintw(row, 1, "press / for commands  |  q to quit  |  j/k to navigate");
+        mvprintw(row, 2, "press / for commands  |  q to quit  |  j/k to navigate");
         attroff(COLOR_PAIR(CP_HINT) | A_DIM);
         curs_set(0);
     }
+}
+
+/* ── autocomplete popup ───────────────────────────────────── */
+
+typedef struct {
+    const char *cmd;
+    const char *desc;
+} CmdDef;
+
+static const CmdDef known_commands[] = {
+    {"add", "Add a new hackathon"},
+    {"win", "Mark as won with optional prize"},
+    {"lose", "Mark as lost"},
+    {"status", "Set status directly"},
+    {"edit", "Edit an entry"},
+    {"delete", "Delete an entry"},
+    {"undo", "Undo last action"},
+    {"list", "List all entries"},
+    {"rate", "Set currency rate"},
+    {"cal", "Show calendar view"},
+};
+#define NUM_CMDS (sizeof(known_commands) / sizeof(known_commands[0]))
+
+static void draw_autocomplete(TuiState *st) {
+    if (!st->cmd_active) return;
+    if (strchr(st->cmd_buf, ' ') != NULL) return; /* don't show if typing args */
+
+    int match_idx[NUM_CMDS];
+    int num_matches = 0;
+    for (size_t i = 0; i < NUM_CMDS; i++) {
+        if (strncmp(known_commands[i].cmd, st->cmd_buf, st->cmd_len) == 0 || st->cmd_len == 0) {
+            match_idx[num_matches++] = i;
+        }
+    }
+
+    if (num_matches == 0) return;
+
+    /* Handle bounds for ac_selected */
+    if (st->ac_selected < 0) st->ac_selected = 0;
+    if (st->ac_selected >= num_matches) st->ac_selected = num_matches - 1;
+
+    int width = 50;
+    int height = num_matches + 2;
+    int start_y = st->term_rows - 2 - height;
+    int start_x = 2;
+
+    if (start_y < 2) return; /* not enough room */
+
+    attron(COLOR_PAIR(CP_ACCENT));
+    mvaddch(start_y, start_x, ACS_ULCORNER);
+    mvhline(start_y, start_x + 1, ACS_HLINE, width - 2);
+    mvaddch(start_y, start_x + width - 1, ACS_URCORNER);
+
+    for (int i = 0; i < num_matches; i++) {
+        mvaddch(start_y + 1 + i, start_x, ACS_VLINE);
+        mvaddch(start_y + 1 + i, start_x + width - 1, ACS_VLINE);
+        
+        /* clear line inside */
+        move(start_y + 1 + i, start_x + 1);
+        for(int x = 0; x < width - 2; x++) addch(' ');
+
+        int c_idx = match_idx[i];
+        if (st->ac_selected == i) {
+            attron(A_REVERSE | A_BOLD);
+        }
+        mvprintw(start_y + 1 + i, start_x + 2, "/%-8s - %s", known_commands[c_idx].cmd, known_commands[c_idx].desc);
+        if (st->ac_selected == i) {
+            attroff(A_REVERSE | A_BOLD);
+        }
+    }
+
+    mvaddch(start_y + height - 1, start_x, ACS_LLCORNER);
+    mvhline(start_y + height - 1, start_x + 1, ACS_HLINE, width - 2);
+    mvaddch(start_y + height - 1, start_x + width - 1, ACS_LRCORNER);
+    attroff(COLOR_PAIR(CP_ACCENT));
 }
 
 /* ── profile indicator ────────────────────────────────────── */
 
 static void draw_profile_indicator(TuiState *st) {
     if (strcmp(st->profile_name, "default") != 0) {
-        int row = 0;
+        int row = 1;
         attron(COLOR_PAIR(CP_ACTIVE_STATUS) | A_DIM);
         mvprintw(row, st->term_cols - strlen(st->profile_name) - 3, "[%s]", st->profile_name);
         attroff(COLOR_PAIR(CP_ACTIVE_STATUS) | A_DIM);
     }
+}
+
+static void draw_form(TuiState *st) {
+    if (!st->form_active) return;
+    int row = st->term_rows - 3;
+    int cols = st->term_cols;
+
+    move(row, 0);
+    clrtobot();
+
+    draw_divider(row, cols);
+    row++;
+
+    attron(COLOR_PAIR(CP_CMDLINE));
+    mvhline(row, 0, ' ', cols);
+
+    if (st->form_step == 0) {
+        mvprintw(row, 2, "Wizard - Name: %s_", st->cmd_buf);
+    } else if (st->form_step == 1) {
+        mvprintw(row, 2, "Wizard - Deadline (YYYY-MM-DD): %s_", st->cmd_buf);
+    }
+    attroff(COLOR_PAIR(CP_CMDLINE));
+
+    attron(COLOR_PAIR(CP_HINT) | A_DIM);
+    mvprintw(row + 1, 2, "Enter: Next  |  Esc: Cancel");
+    attroff(COLOR_PAIR(CP_HINT) | A_DIM);
+}
+
+static void draw_action_menu(TuiState *st) {
+    if (!st->action_menu_active) return;
+
+    int num_opts = 4;
+    const char *opts[] = {
+        " Mark Won",
+        " Mark Lost",
+        " Edit",
+        " Delete"
+    };
+
+    int width = 24;
+    int height = num_opts + 2;
+    int start_y = (st->term_rows - height) / 2;
+    int start_x = (st->term_cols - width) / 2;
+
+    if (start_y < 2) start_y = 2;
+
+    attron(COLOR_PAIR(CP_ACCENT));
+    mvaddch(start_y, start_x, ACS_ULCORNER);
+    mvhline(start_y, start_x + 1, ACS_HLINE, width - 2);
+    mvaddch(start_y, start_x + width - 1, ACS_URCORNER);
+
+    for (int i = 0; i < num_opts; i++) {
+        mvaddch(start_y + 1 + i, start_x, ACS_VLINE);
+        mvaddch(start_y + 1 + i, start_x + width - 1, ACS_VLINE);
+        
+        move(start_y + 1 + i, start_x + 1);
+        for(int x = 0; x < width - 2; x++) addch(' ');
+
+        if (st->action_selected == i) attron(A_REVERSE | A_BOLD);
+        mvprintw(start_y + 1 + i, start_x + 3, "%s", opts[i]);
+        if (st->action_selected == i) attroff(A_REVERSE | A_BOLD);
+    }
+
+    mvaddch(start_y + height - 1, start_x, ACS_LLCORNER);
+    mvhline(start_y + height - 1, start_x + 1, ACS_HLINE, width - 2);
+    mvaddch(start_y + height - 1, start_x + width - 1, ACS_LRCORNER);
+    attroff(COLOR_PAIR(CP_ACCENT));
 }
 
 /* ── main draw ────────────────────────────────────────────── */
@@ -427,11 +608,24 @@ static void tui_draw(TuiState *st) {
 
     getmaxyx(stdscr, st->term_rows, st->term_cols);
 
+    /* Draw global border */
+    attron(COLOR_PAIR(CP_DIMMED));
+    box(stdscr, 0, 0);
+    attroff(COLOR_PAIR(CP_DIMMED));
+
     int row = draw_banner(st);
     draw_profile_indicator(st);
     row = draw_stats(st, row);
     draw_entry_list(st, row);
-    draw_cmdline(st);
+    
+    if (st->form_active) {
+        draw_form(st);
+    } else {
+        draw_cmdline(st);
+        draw_autocomplete(st);
+    }
+
+    draw_action_menu(st);
 
     refresh();
 }
@@ -453,6 +647,18 @@ static void execute_command(TuiState *st) {
     /* Tokenize and dispatch */
     char **argv = NULL;
     int argc = tokenize_command(st->cmd_buf, &argv);
+
+    if (argc == 1 && strcasecmp(argv[0], "add") == 0) {
+        st->form_active = 1;
+        st->form_step = 0;
+        st->form_name[0] = '\0';
+        st->form_deadline[0] = '\0';
+        st->cmd_active = 0;
+        st->cmd_buf[0] = '\0';
+        st->cmd_len = 0;
+        free_tokens(argc, argv);
+        return;
+    }
 
     if (argc > 0) {
         CmdResult result = cmd_dispatch(argc, argv, &st->cmd_ctx);
@@ -623,7 +829,7 @@ static void draw_calendar_view(TuiState *st, int year, int month) {
     int legend_row = grid_start + 14; /* after the grid */
     if (legend_row >= rows - 2) legend_row = rows - 4;
 
-    draw_hline(legend_row - 1, 0, cols);
+    draw_divider(legend_row - 1, cols);
     attron(COLOR_PAIR(CP_ACCENT) | A_BOLD);
     mvprintw(legend_row, 1, "Legend:");
     attroff(COLOR_PAIR(CP_ACCENT) | A_BOLD);
@@ -722,22 +928,120 @@ int tui_run(const char *profile_name) {
 
         int ch = getch();
 
-        if (st.cmd_active) {
+        if (st.form_active) {
+            if (ch == 27) { /* Esc */
+                st.form_active = 0;
+                st.cmd_buf[0] = '\0';
+                st.cmd_len = 0;
+            } else if (ch == '\n' || ch == KEY_ENTER) {
+                if (st.form_step == 0) {
+                    strncpy(st.form_name, st.cmd_buf, sizeof(st.form_name) - 1);
+                    st.cmd_buf[0] = '\0';
+                    st.cmd_len = 0;
+                    st.form_step = 1;
+                } else if (st.form_step == 1) {
+                    strncpy(st.form_deadline, st.cmd_buf, sizeof(st.form_deadline) - 1);
+                    char full_cmd[512];
+                    snprintf(full_cmd, sizeof(full_cmd), "add \"%s\" --deadline %s", st.form_name, st.form_deadline);
+                    strncpy(st.cmd_buf, full_cmd, sizeof(st.cmd_buf)-1);
+                    st.cmd_len = strlen(st.cmd_buf);
+                    execute_command(&st);
+                    st.form_active = 0;
+                }
+            } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
+                if (st.cmd_len > 0) st.cmd_buf[--st.cmd_len] = '\0';
+            } else if (ch >= 32 && ch < 127 && st.cmd_len < 510) {
+                st.cmd_buf[st.cmd_len++] = (char)ch;
+                st.cmd_buf[st.cmd_len] = '\0';
+            }
+        } else if (st.action_menu_active) {
+            if (ch == 27 || ch == 'q') {
+                st.action_menu_active = 0;
+            } else if (ch == KEY_DOWN || ch == 'j') {
+                st.action_selected = (st.action_selected + 1) % 4;
+            } else if (ch == KEY_UP || ch == 'k') {
+                st.action_selected = (st.action_selected + 3) % 4;
+            } else if (ch == '\n' || ch == KEY_ENTER) {
+                st.action_menu_active = 0;
+                const HackEntry *e = &st.log.entries[st.selected];
+                if (st.action_selected == 0) {
+                    snprintf(st.cmd_buf, sizeof(st.cmd_buf), "win \"%s\"", e->name);
+                    st.cmd_len = strlen(st.cmd_buf);
+                    execute_command(&st);
+                } else if (st.action_selected == 1) {
+                    snprintf(st.cmd_buf, sizeof(st.cmd_buf), "lose \"%s\"", e->name);
+                    st.cmd_len = strlen(st.cmd_buf);
+                    execute_command(&st);
+                } else if (st.action_selected == 2) {
+                    snprintf(st.cmd_buf, sizeof(st.cmd_buf), "edit \"%s\" --", e->name);
+                    st.cmd_len = strlen(st.cmd_buf);
+                    st.cmd_active = 1;
+                } else if (st.action_selected == 3) {
+                    snprintf(st.cmd_buf, sizeof(st.cmd_buf), "delete \"%s\"", e->name);
+                    st.cmd_len = strlen(st.cmd_buf);
+                    execute_command(&st);
+                }
+            }
+        } else if (st.cmd_active) {
             /* Command line mode */
             if (ch == 27) { /* Esc */
                 st.cmd_active = 0;
                 st.cmd_buf[0] = '\0';
                 st.cmd_len = 0;
                 st.message[0] = '\0';
+                st.ac_selected = -1;
+            } else if (ch == 9) { /* Tab */
+                if (strchr(st.cmd_buf, ' ') == NULL) {
+                    int num_matches = 0;
+                    for (size_t i = 0; i < NUM_CMDS; i++) {
+                        if (strncmp(known_commands[i].cmd, st.cmd_buf, st.cmd_len) == 0 || st.cmd_len == 0) {
+                            num_matches++;
+                        }
+                    }
+                    if (num_matches > 0) {
+                        st.ac_selected = (st.ac_selected + 1) % num_matches;
+                    }
+                }
+            } else if (ch == KEY_DOWN) {
+                if (strchr(st.cmd_buf, ' ') == NULL) {
+                    st.ac_selected++;
+                }
+            } else if (ch == KEY_UP) {
+                if (strchr(st.cmd_buf, ' ') == NULL) {
+                    st.ac_selected--;
+                }
             } else if (ch == '\n' || ch == KEY_ENTER) {
+                if (strchr(st.cmd_buf, ' ') == NULL && st.ac_selected >= 0) {
+                    int match_idx[NUM_CMDS];
+                    int num_matches = 0;
+                    for (size_t i = 0; i < NUM_CMDS; i++) {
+                        if (strncmp(known_commands[i].cmd, st.cmd_buf, st.cmd_len) == 0 || st.cmd_len == 0) {
+                            match_idx[num_matches++] = i;
+                        }
+                    }
+                    if (num_matches > 0) {
+                        if (st.ac_selected >= num_matches) st.ac_selected = num_matches - 1;
+                        if (st.ac_selected < 0) st.ac_selected = 0;
+                        int c_idx = match_idx[st.ac_selected];
+                        strcpy(st.cmd_buf, known_commands[c_idx].cmd);
+                        st.cmd_len = strlen(st.cmd_buf);
+                        st.cmd_buf[st.cmd_len++] = ' ';
+                        st.cmd_buf[st.cmd_len] = '\0';
+                        st.ac_selected = -1;
+                        continue; /* Autocomplete applied, don't execute yet */
+                    }
+                }
                 execute_command(&st);
+                st.ac_selected = -1;
             } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
                 if (st.cmd_len > 0) {
                     st.cmd_buf[--st.cmd_len] = '\0';
+                    st.ac_selected = 0;
                 }
             } else if (ch >= 32 && ch < 127 && st.cmd_len < 510) {
                 st.cmd_buf[st.cmd_len++] = (char)ch;
                 st.cmd_buf[st.cmd_len] = '\0';
+                st.ac_selected = 0;
             }
         } else {
             /* Normal mode */
@@ -773,6 +1077,13 @@ int tui_run(const char *profile_name) {
                 case 'G': /* go to bottom */
                     if (st.log.count > 0) {
                         st.selected = st.log.count - 1;
+                    }
+                    break;
+                case '\n':
+                case KEY_ENTER:
+                    if (st.log.count > 0) {
+                        st.action_menu_active = 1;
+                        st.action_selected = 0;
                     }
                     break;
                 case KEY_RESIZE:

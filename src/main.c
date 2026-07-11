@@ -32,6 +32,9 @@ extern int tui_run(const char *profile_name);
 extern void calendar_print_static(const HackLog *log);
 
 int main(int argc, char *argv[]) {
+    #include <locale.h>
+    setlocale(LC_ALL, "");
+
     /* Initialize hacklog directory structure */
     hacklog_dir_init();
 
