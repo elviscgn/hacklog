@@ -167,7 +167,8 @@ static int parse_tsv_line(const char *line, HackEntry *entry) {
 
     /* Field 6: notes (optional) */
     if (field_count > 6 && fields[6][0] != '\t') {
-        size_t len = strlen(fields[6]);
+        const char *end = strchr(fields[6], '\t');
+        size_t len = end ? (size_t)(end - fields[6]) : strlen(fields[6]);
         /* Strip trailing newline */
         while (len > 0 && (fields[6][len-1] == '\n' || fields[6][len-1] == '\r')) {
             len--;
