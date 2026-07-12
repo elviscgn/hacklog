@@ -4,6 +4,8 @@
 
 terminal-native hackathon and project logbook. track what you're in, what's due, and your win/loss record without leaving the terminal.
 
+![hacklog demo](asset/demo.png)
+
 ## features
 
 - **tui dashboard**: type `hack` to open the terminal ui with a nice banner, quick stats, and list
