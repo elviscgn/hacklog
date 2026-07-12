@@ -537,7 +537,7 @@ static void draw_form(TuiState *st) {
     if (st->form_step == 0) {
         mvprintw(row, 2, "%s - Name: %s_", prefix, st->cmd_buf);
     } else if (st->form_step == 1) {
-        mvprintw(row, 2, "%s - Deadline (YYYY-MM-DD): %s_", prefix, st->cmd_buf);
+        mvprintw(row, 2, "%s [%s] - Deadline (YYYY-MM-DD): %s_", prefix, st->form_name, st->cmd_buf);
     }
     attroff(COLOR_PAIR(CP_CMDLINE));
 
@@ -660,7 +660,7 @@ static void execute_command(TuiState *st) {
 
         /* Handle profile switch */
         if (st->cmd_ctx.needs_reload) {
-            strncpy(st->profile_name, st->cmd_ctx.profile_name, sizeof(st->profile_name) - 1);
+            /* ctx.profile_name already wrote to st->profile_name */
             tui_load_data(st);
             st->selected = 0;
             st->scroll_offset = 0;
@@ -988,14 +988,22 @@ int tui_run(const char *profile_name) {
                 st.ac_selected = -1;
             } else if (ch == 9) { /* Tab */
                 if (strchr(st.cmd_buf, ' ') == NULL) {
+                    int match_idx[NUM_CMDS];
                     int num_matches = 0;
                     for (size_t i = 0; i < NUM_CMDS; i++) {
                         if (strncmp(known_commands[i].cmd, st.cmd_buf, st.cmd_len) == 0 || st.cmd_len == 0) {
-                            num_matches++;
+                            match_idx[num_matches++] = i;
                         }
                     }
                     if (num_matches > 0) {
-                        st.ac_selected = (st.ac_selected + 1) % num_matches;
+                        int sel = st.ac_selected >= 0 ? st.ac_selected : 0;
+                        if (sel >= num_matches) sel = num_matches - 1;
+                        int c_idx = match_idx[sel];
+                        strcpy(st.cmd_buf, known_commands[c_idx].cmd);
+                        st.cmd_len = strlen(st.cmd_buf);
+                        st.cmd_buf[st.cmd_len++] = ' ';
+                        st.cmd_buf[st.cmd_len] = '\0';
+                        st.ac_selected = -1;
                     }
                 }
             } else if (ch == KEY_DOWN) {
