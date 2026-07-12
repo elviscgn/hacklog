@@ -27,6 +27,7 @@ enum {
     CP_CMDLINE,        /* command line background */
     CP_ERROR,          /* error messages */
     CP_HINT,           /* hint text */
+    CP_SELECTED,       /* magenta selected row */
 };
 
 static void init_colors(void) {
@@ -44,6 +45,7 @@ static void init_colors(void) {
     init_pair(CP_CMDLINE,       COLOR_WHITE,   -1);
     init_pair(CP_ERROR,         COLOR_RED,     -1);
     init_pair(CP_HINT,          COLOR_WHITE,   -1);
+    init_pair(CP_SELECTED,      COLOR_MAGENTA, -1);
 }
 
 /* ── TUI state ────────────────────────────────────────────── */
@@ -295,14 +297,16 @@ static void draw_entry_list(TuiState *st, int start_row) {
 
     /* Column widths */
     int col_deadline = 4;
-    int col_status   = 16;
-    int col_name     = 28;
+    int col_status   = 18;
+    int col_name     = 32;
+    int col_notes    = 75;
 
     /* Header row */
     attron(A_BOLD | A_UNDERLINE | COLOR_PAIR(CP_ACCENT));
-    mvprintw(start_row, col_deadline, "DEADLINE");
-    mvprintw(start_row, col_status, "STATUS");
-    mvprintw(start_row, col_name, "NAME");
+    mvprintw(start_row, col_deadline, "📅 DEADLINE");
+    mvprintw(start_row, col_status, "🚥 STATUS");
+    mvprintw(start_row, col_name, "📝 NAME");
+    mvprintw(start_row, col_notes, "📌 NOTES");
     attroff(A_BOLD | A_UNDERLINE | COLOR_PAIR(CP_ACCENT));
 
     int row = start_row + 2; /* extra spacing after header */
@@ -336,7 +340,7 @@ static void draw_entry_list(TuiState *st, int start_row) {
         for(int x=1; x<cols-1; x++) addch(' ');
 
         if (is_selected) {
-            attron(COLOR_PAIR(CP_ACCENT) | A_BOLD);
+            attron(COLOR_PAIR(CP_SELECTED) | A_BOLD);
             mvprintw(row + i, 2, ">");
             attroff(A_BOLD);
         }
@@ -346,7 +350,7 @@ static void draw_entry_list(TuiState *st, int start_row) {
             int dl_color = deadline_color(e->deadline);
             if (dl_color != CP_NORMAL) attron(COLOR_PAIR(dl_color));
         } else {
-            attron(COLOR_PAIR(CP_ACCENT));
+            attron(COLOR_PAIR(CP_SELECTED));
         }
         mvprintw(row + i, col_deadline, "%-10s", e->deadline);
         if (!is_selected) {
@@ -364,7 +368,7 @@ static void draw_entry_list(TuiState *st, int start_row) {
         }
 
         /* Name */
-        int max_name = cols - col_name - 2;
+        int max_name = col_notes - col_name - 2;
         if (max_name > MAX_NAME_LEN) max_name = MAX_NAME_LEN;
         if (max_name < 10) max_name = 10;
         char name_trunc[MAX_NAME_LEN];
@@ -376,8 +380,22 @@ static void draw_entry_list(TuiState *st, int start_row) {
         }
         mvprintw(row + i, col_name, "%s", name_trunc);
 
+        /* Notes */
+        int max_notes = cols - col_notes - 2;
+        if (max_notes > MAX_NOTES_LEN) max_notes = MAX_NOTES_LEN;
+        if (max_notes > 0 && e->notes[0] != '\0') {
+            char notes_trunc[MAX_NOTES_LEN];
+            strncpy(notes_trunc, e->notes, max_notes);
+            notes_trunc[max_notes] = '\0';
+            if ((int)strlen(e->notes) > max_notes && max_notes > 3) {
+                notes_trunc[max_notes - 1] = '.';
+                notes_trunc[max_notes - 2] = '.';
+            }
+            mvprintw(row + i, col_notes, "%s", notes_trunc);
+        }
+
         if (is_selected) {
-            attroff(COLOR_PAIR(CP_ACCENT));
+            attroff(COLOR_PAIR(CP_SELECTED));
         }
     }
 
