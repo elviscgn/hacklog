@@ -87,11 +87,11 @@ static int parse_tsv_line(const char *line, HackEntry *entry) {
     memset(entry, 0, sizeof(HackEntry));
 
     /* We need to split by tabs — up to 7 fields */
-    const char *fields[7];
+    const char *fields[8];
     int field_count = 0;
     const char *p = line;
 
-    for (int i = 0; i < 7 && p; i++) {
+    for (int i = 0; i < 8 && p; i++) {
         fields[i] = p;
         field_count++;
         const char *tab = strchr(p, '\t');
@@ -165,8 +165,8 @@ static int parse_tsv_line(const char *line, HackEntry *entry) {
         entry->prize_zar = atof(buf);
     }
 
-    /* Field 6: notes (optional, last field — can contain anything except tab/newline) */
-    if (field_count > 6) {
+    /* Field 6: notes (optional) */
+    if (field_count > 6 && fields[6][0] != '\t') {
         size_t len = strlen(fields[6]);
         /* Strip trailing newline */
         while (len > 0 && (fields[6][len-1] == '\n' || fields[6][len-1] == '\r')) {
@@ -175,6 +175,13 @@ static int parse_tsv_line(const char *line, HackEntry *entry) {
         if (len >= MAX_NOTES_LEN) len = MAX_NOTES_LEN - 1;
         strncpy(entry->notes, fields[6], len);
         entry->notes[len] = '\0';
+    }
+
+    /* Field 7: is_team (optional, default 0) */
+    if (field_count > 7 && fields[7][0] != '\t') {
+        entry->is_team = atoi(fields[7]);
+    } else {
+        entry->is_team = 0;
     }
 
     return 0;
@@ -220,14 +227,15 @@ int hacklog_save(const char *profile_name, const HackLog *log) {
 
     for (int i = 0; i < log->count; i++) {
         const HackEntry *e = &log->entries[i];
-        fprintf(f, "%s\t%s\t%s\t%.2f\t%s\t%.2f\t%s\n",
+        fprintf(f, "%s\t%s\t%s\t%.2f\t%s\t%.2f\t%s\t%d\n",
                 e->name,
                 e->deadline,
                 status_to_str(e->status),
                 e->prize_amount,
                 e->prize_currency,
                 e->prize_zar,
-                e->notes);
+                e->notes,
+                e->is_team);
     }
 
     fclose(f);
@@ -252,6 +260,7 @@ void hacklog_seed_demo(void) {
     strcpy(e->prize_currency, "USD");
     e->prize_zar = 9250.0;
     strcpy(e->notes, "Built a climate dashboard with React");
+    e->is_team = 1;
 
     e = &log.entries[log.count++];
     strcpy(e->name, "Devpost AI Horizons");
@@ -261,27 +270,31 @@ void hacklog_seed_demo(void) {
     strcpy(e->prize_currency, "USD");
     e->prize_zar = 46250.0;
     strcpy(e->notes, "RAG pipeline with local models, team of 3");
+    e->is_team = 1;
 
     e = &log.entries[log.count++];
     strcpy(e->name, "ETHGlobal Cape Town");
     strcpy(e->deadline, "2026-06-15");
     e->status = STATUS_LOST;
     strcpy(e->notes, "DeFi lending protocol, ran out of time on the frontend");
+    e->is_team = 1;
 
     e = &log.entries[log.count++];
     strcpy(e->name, "Google Solution Challenge");
     strcpy(e->deadline, "2026-06-28");
     e->status = STATUS_WON;
     e->prize_amount = 1000;
-    strcpy(e->prize_currency, "USD");
-    e->prize_zar = 18500.0;
-    strcpy(e->notes, "Water quality monitoring IoT system");
+    strcpy(e->prize_currency, "ZAR");
+    e->prize_zar = 2500.0;
+    strcpy(e->notes, "Solo AI agent project");
+    e->is_team = 0;
 
     e = &log.entries[log.count++];
     strcpy(e->name, "TreeHacks Stanford");
     strcpy(e->deadline, "2026-07-05");
     e->status = STATUS_LOST;
     strcpy(e->notes, "Mental health chatbot, judging was tough");
+    e->is_team = 1;
 
     e = &log.entries[log.count++];
     strcpy(e->name, "Kaggle BIPOC in ML");

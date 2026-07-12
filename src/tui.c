@@ -74,17 +74,22 @@ typedef struct {
   int list_start_row; /* where entry list begins */
   int list_height;    /* visible entry rows */
 
-  /* Form state */
-  int form_active;
-  int form_step; /* 0: name, 1: deadline */
-  char form_name[128];
-  char form_deadline[64];
-  int form_is_edit;
-  char form_orig_name[128];
+  /* Action Menu state */
+  int         action_menu_active; /* 1 if basic action menu open */
+  int         action_selected;    /* index in action menu */
 
-  /* Action menu state */
-  int action_menu_active;
-  int action_selected;
+  /* Status Menu state */
+  int         status_menu_active; /* 1 if status selection open */
+  int         status_selected;
+
+  /* Add/Edit Form Wizard */
+  int         form_active;
+  int         form_is_edit;
+  int         form_step;
+  char        form_orig_name[MAX_NAME_LEN];
+  char        form_name[MAX_NAME_LEN];
+  char        form_deadline[11];
+  int         form_is_team;
 
   /* Calendar mode */
   int in_calendar;
@@ -319,15 +324,19 @@ static void draw_entry_list(TuiState *st, int start_row) {
   int col_deadline = 4;
   int col_status = 18;
   int col_name = 32;
-  int col_notes = 75;
+  int col_prize = 55;
+  int col_team = 68;
+  int col_notes = 78;
 
   /* Header row */
-  attron(A_BOLD | A_UNDERLINE | COLOR_PAIR(CP_ACCENT));
+  attron(A_BOLD | COLOR_PAIR(CP_ACCENT));
   mvprintw(start_row, col_deadline, "  DEADLINE");
   mvprintw(start_row, col_status, "  STATUS");
   mvprintw(start_row, col_name, "󰈚  NAME");
+  mvprintw(start_row, col_prize, "  PRIZE");
+  mvprintw(start_row, col_team, "  TEAM");
   mvprintw(start_row, col_notes, "  NOTES");
-  attroff(A_BOLD | A_UNDERLINE | COLOR_PAIR(CP_ACCENT));
+  attroff(A_BOLD | COLOR_PAIR(CP_ACCENT));
 
   int row = start_row + 2; /* extra spacing after header */
 
@@ -392,7 +401,7 @@ static void draw_entry_list(TuiState *st, int start_row) {
     }
 
     /* Name */
-    int max_name = cols - col_name - 2;
+    int max_name = col_prize - col_name - 2;
     if (max_name > MAX_NAME_LEN)
       max_name = MAX_NAME_LEN;
     if (max_name < 10)
@@ -405,6 +414,32 @@ static void draw_entry_list(TuiState *st, int start_row) {
       name_trunc[max_name - 2] = '.';
     }
     mvprintw(row + i, col_name, "%s", name_trunc);
+
+    /* Prize */
+    if (e->prize_amount > 0) {
+        mvprintw(row + i, col_prize, "%s %.0f", e->prize_currency, e->prize_amount);
+    }
+
+    /* Team */
+    if (e->is_team) {
+        mvprintw(row + i, col_team, "Team");
+    } else {
+        mvprintw(row + i, col_team, "Solo");
+    }
+
+    /* Notes */
+    int max_notes = cols - col_notes - 2;
+    if (max_notes > MAX_NOTES_LEN) max_notes = MAX_NOTES_LEN;
+    if (max_notes > 0 && e->notes[0] != '\0') {
+        char notes_trunc[MAX_NOTES_LEN];
+        strncpy(notes_trunc, e->notes, max_notes);
+        notes_trunc[max_notes] = '\0';
+        if ((int)strlen(e->notes) > max_notes && max_notes > 3) {
+            notes_trunc[max_notes - 1] = '.';
+            notes_trunc[max_notes - 2] = '.';
+        }
+        mvprintw(row + i, col_notes, "%s", notes_trunc);
+    }
 
     if (is_selected) {
       attroff(COLOR_PAIR(CP_ACCENT));
@@ -581,6 +616,9 @@ static void draw_form(TuiState *st) {
   } else if (st->form_step == 1) {
     mvprintw(row, 2, "%s [%s] - Deadline (YYYY-MM-DD): %s_", prefix,
              st->form_name, st->cmd_buf);
+  } else if (st->form_step == 2) {
+    mvprintw(row, 2, "%s [%s] - Team or Solo? (team/solo): %s_", prefix,
+             st->form_name, st->cmd_buf);
   }
   attroff(COLOR_PAIR(CP_CMDLINE));
 
@@ -593,9 +631,9 @@ static void draw_action_menu(TuiState *st) {
   if (!st->action_menu_active)
     return;
 
-  int num_opts = 4;
+  int num_opts = 5;
   const char *opts[] = {" Mark Won", " Mark Lost", " Edit",
-                        " Delete"};
+                        "🚥 Change Status", " Delete"};
 
   int width = 24;
   int height = num_opts + 2;
@@ -631,6 +669,49 @@ static void draw_action_menu(TuiState *st) {
   attroff(COLOR_PAIR(CP_ACCENT));
 }
 
+static void draw_status_menu(TuiState *st) {
+  if (!st->status_menu_active)
+    return;
+
+  int num_opts = 7;
+  const char *opts[] = {
+    "🚥 Applied", "🚥 Active", "🚥 Submitted",
+    " Won", " Lost", " Rejected", " Cancelled"
+  };
+
+  int width = 24;
+  int height = num_opts + 2;
+  int start_y = (st->term_rows - height) / 2;
+  int start_x = (st->term_cols - width) / 2;
+
+  if (start_y < 2) start_y = 2;
+
+  attron(COLOR_PAIR(CP_ACCENT));
+  mvaddch(start_y, start_x, ACS_ULCORNER);
+  mvhline(start_y, start_x + 1, ACS_HLINE, width - 2);
+  mvaddch(start_y, start_x + width - 1, ACS_URCORNER);
+
+  for (int i = 0; i < num_opts; i++) {
+    mvaddch(start_y + 1 + i, start_x, ACS_VLINE);
+    mvaddch(start_y + 1 + i, start_x + width - 1, ACS_VLINE);
+
+    move(start_y + 1 + i, start_x + 1);
+    for (int x = 0; x < width - 2; x++)
+      addch(' ');
+
+    if (st->status_selected == i)
+      attron(A_REVERSE | A_BOLD);
+    mvprintw(start_y + 1 + i, start_x + 3, "%s", opts[i]);
+    if (st->status_selected == i)
+      attroff(A_REVERSE | A_BOLD);
+  }
+
+  mvaddch(start_y + height - 1, start_x, ACS_LLCORNER);
+  mvhline(start_y + height - 1, start_x + 1, ACS_HLINE, width - 2);
+  mvaddch(start_y + height - 1, start_x + width - 1, ACS_LRCORNER);
+  attroff(COLOR_PAIR(CP_ACCENT));
+}
+
 /* ── main draw ────────────────────────────────────────────── */
 
 static void tui_draw(TuiState *st) {
@@ -656,6 +737,7 @@ static void tui_draw(TuiState *st) {
   }
 
   draw_action_menu(st);
+  draw_status_menu(st);
 
   refresh();
 }
@@ -979,14 +1061,20 @@ int tui_run(const char *profile_name) {
           st.form_step = 1;
         } else if (st.form_step == 1) {
           strncpy(st.form_deadline, st.cmd_buf, sizeof(st.form_deadline) - 1);
+          st.cmd_buf[0] = '\0';
+          st.cmd_len = 0;
+          st.form_step = 2;
+        } else if (st.form_step == 2) {
+          int is_team = (strcasecmp(st.cmd_buf, "team") == 0 || strcasecmp(st.cmd_buf, "t") == 0 || strcasecmp(st.cmd_buf, "yes") == 0) ? 1 : 0;
+          const char *team_flag = is_team ? "--team" : "--solo";
           char full_cmd[512];
           if (st.form_is_edit) {
             snprintf(full_cmd, sizeof(full_cmd),
-                     "edit \"%s\" --name \"%s\" --deadline %s",
-                     st.form_orig_name, st.form_name, st.form_deadline);
+                     "edit \"%s\" --name \"%s\" --deadline %s %s",
+                     st.form_orig_name, st.form_name, st.form_deadline, team_flag);
           } else {
-            snprintf(full_cmd, sizeof(full_cmd), "add \"%s\" --deadline %s",
-                     st.form_name, st.form_deadline);
+            snprintf(full_cmd, sizeof(full_cmd), "add \"%s\" --deadline %s %s",
+                     st.form_name, st.form_deadline, team_flag);
           }
           strncpy(st.cmd_buf, full_cmd, sizeof(st.cmd_buf) - 1);
           st.cmd_len = strlen(st.cmd_buf);
@@ -1001,13 +1089,28 @@ int tui_run(const char *profile_name) {
         st.cmd_buf[st.cmd_len++] = (char)ch;
         st.cmd_buf[st.cmd_len] = '\0';
       }
+    } else if (st.status_menu_active) {
+      if (ch == 27 || ch == 'q') {
+        st.status_menu_active = 0;
+      } else if (ch == KEY_DOWN || ch == 'j') {
+        st.status_selected = (st.status_selected + 1) % 7;
+      } else if (ch == KEY_UP || ch == 'k') {
+        st.status_selected = (st.status_selected + 6) % 7;
+      } else if (ch == '\n' || ch == KEY_ENTER) {
+        st.status_menu_active = 0;
+        const HackEntry *e = &st.log.entries[st.selected];
+        const char *status_strs[] = {"applied", "active", "submitted", "won", "lost", "rejected", "cancelled"};
+        snprintf(st.cmd_buf, sizeof(st.cmd_buf), "status \"%s\" %s", e->name, status_strs[st.status_selected]);
+        st.cmd_len = strlen(st.cmd_buf);
+        execute_command(&st);
+      }
     } else if (st.action_menu_active) {
       if (ch == 27 || ch == 'q') {
         st.action_menu_active = 0;
       } else if (ch == KEY_DOWN || ch == 'j') {
-        st.action_selected = (st.action_selected + 1) % 4;
+        st.action_selected = (st.action_selected + 1) % 5;
       } else if (ch == KEY_UP || ch == 'k') {
-        st.action_selected = (st.action_selected + 3) % 4;
+        st.action_selected = (st.action_selected + 4) % 5;
       } else if (ch == '\n' || ch == KEY_ENTER) {
         st.action_menu_active = 0;
         const HackEntry *e = &st.log.entries[st.selected];
@@ -1027,6 +1130,9 @@ int tui_run(const char *profile_name) {
           strncpy(st.cmd_buf, e->name, sizeof(st.cmd_buf) - 1);
           st.cmd_len = strlen(st.cmd_buf);
         } else if (st.action_selected == 3) {
+          st.status_menu_active = 1;
+          st.status_selected = 0;
+        } else if (st.action_selected == 4) {
           snprintf(st.cmd_buf, sizeof(st.cmd_buf), "delete \"%s\"", e->name);
           st.cmd_len = strlen(st.cmd_buf);
           execute_command(&st);

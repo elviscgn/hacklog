@@ -132,6 +132,15 @@ CmdResult cmd_add(int argc, char **argv, CmdContext *ctx) {
         strncpy(e->notes, notes, MAX_NOTES_LEN - 1);
     }
 
+    /* Team or Solo */
+    for (int i = 0; i < argc; i++) {
+        if (strcasecmp(argv[i], "--team") == 0) {
+            e->is_team = 1;
+        } else if (strcasecmp(argv[i], "--solo") == 0) {
+            e->is_team = 0;
+        }
+    }
+
     ctx->log->count++;
     ctx->needs_save = 1;
     sort_entries_by_deadline(ctx->log);
@@ -270,7 +279,28 @@ CmdResult cmd_edit(int argc, char **argv, CmdContext *ctx) {
     }
 
     if (!changed) {
-        return make_result(-1, "Nothing to edit — provide at least one flag");
+        /* check team flags separately */
+        for (int i = 0; i < argc; i++) {
+            if (strcasecmp(argv[i], "--team") == 0) {
+                e->is_team = 1;
+                changed = 1;
+            } else if (strcasecmp(argv[i], "--solo") == 0) {
+                e->is_team = 0;
+                changed = 1;
+            }
+        }
+        
+        if (!changed) {
+            return make_result(-1, "Nothing to edit — provide at least one flag");
+        }
+    } else {
+        for (int i = 0; i < argc; i++) {
+            if (strcasecmp(argv[i], "--team") == 0) {
+                e->is_team = 1;
+            } else if (strcasecmp(argv[i], "--solo") == 0) {
+                e->is_team = 0;
+            }
+        }
     }
 
     ctx->needs_save = 1;

@@ -30,6 +30,7 @@ typedef struct {
     char        prize_currency[MAX_CURRENCY_LEN]; /* e.g. "USD", "" if none */
     double      prize_zar;             /* frozen ZAR-converted value */
     char        notes[MAX_NOTES_LEN];
+    int         is_team;               /* 0 = solo, 1 = team */
 } HackEntry;
 
 /* Collection of entries — the in-memory database */
