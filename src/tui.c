@@ -322,11 +322,11 @@ static void draw_entry_list(TuiState *st, int start_row) {
 
   /* Column widths */
   int col_deadline = 4;
-  int col_status = 18;
-  int col_name = 32;
-  int col_prize = 55;
-  int col_team = 68;
-  int col_notes = 78;
+  int col_status = 22;
+  int col_name = 36;
+  int col_prize = 59;
+  int col_team = 72;
+  int col_notes = 82;
 
   /* Header row */
   attron(A_BOLD | COLOR_PAIR(CP_ACCENT));
@@ -384,7 +384,12 @@ static void draw_entry_list(TuiState *st, int start_row) {
     } else {
       attron(COLOR_PAIR(CP_ACCENT));
     }
-    mvprintw(row + i, col_deadline, "%-10s", e->deadline);
+    int days = days_until_deadline(e->deadline);
+    if (days >= 0 && days < 999) {
+      mvprintw(row + i, col_deadline, "%s (%dd)", e->deadline, days);
+    } else {
+      mvprintw(row + i, col_deadline, "%-10s", e->deadline);
+    }
     if (!is_selected) {
       int dl_color = deadline_color(e->deadline);
       if (dl_color != CP_NORMAL)
