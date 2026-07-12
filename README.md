@@ -4,7 +4,7 @@
 
 terminal-native hackathon and project logbook. track what you're in, what's due, and your win/loss record without leaving the terminal.
 
-![hacklog demo](asset/demo.png)
+![hacklog demo](assets/demo.png)
 
 ## features
 
