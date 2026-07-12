@@ -1032,6 +1032,7 @@ int tui_run(const char *profile_name) {
   tui_load_data(&st);
 
   /* Initialize ncurses */
+  setenv("ESCDELAY", "25", 1);
   initscr();
   cbreak();
   noecho();
