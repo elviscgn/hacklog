@@ -609,21 +609,19 @@ static void draw_form(TuiState *st) {
   attron(COLOR_PAIR(CP_CMDLINE));
   mvhline(row, 0, ' ', cols);
 
-  const char *prefix = st->form_is_edit ? "Edit Wizard" : "Wizard";
-
   if (st->form_step == 0) {
-    mvprintw(row, 2, "%s - Name: %s_", prefix, st->cmd_buf);
+    mvprintw(row, 2, "Edit Name: %s_", st->cmd_buf);
   } else if (st->form_step == 1) {
-    mvprintw(row, 2, "%s [%s] - Deadline (YYYY-MM-DD): %s_", prefix,
-             st->form_name, st->cmd_buf);
+    mvprintw(row, 2, "Edit Deadline (YYYY-MM-DD): %s_", st->cmd_buf);
   } else if (st->form_step == 2) {
-    mvprintw(row, 2, "%s [%s] - Team or Solo? (team/solo): %s_", prefix,
-             st->form_name, st->cmd_buf);
+    mvprintw(row, 2, "Edit Prize (e.g. $1000): %s_", st->cmd_buf);
+  } else if (st->form_step == 3) {
+    mvprintw(row, 2, "Edit Notes: %s_", st->cmd_buf);
   }
   attroff(COLOR_PAIR(CP_CMDLINE));
 
   attron(COLOR_PAIR(CP_HINT) | A_DIM);
-  mvprintw(row + 1, 2, "Enter: Next  |  Esc: Cancel");
+  mvprintw(row + 1, 2, "Enter: Save  |  Esc: Cancel");
   attroff(COLOR_PAIR(CP_HINT) | A_DIM);
 }
 
@@ -631,9 +629,18 @@ static void draw_action_menu(TuiState *st) {
   if (!st->action_menu_active)
     return;
 
-  int num_opts = 5;
-  const char *opts[] = {" Mark Won", " Mark Lost", " Edit",
-                        "🚥 Change Status", " Delete"};
+  int num_opts = 9;
+  const char *opts[] = {
+    " Mark Won",
+    " Mark Lost",
+    "🚥 Change Status",
+    "󰈚 Edit Name",
+    " Edit Deadline",
+    " Edit Prize",
+    " Edit Notes",
+    " Toggle Team/Solo",
+    " Delete"
+  };
 
   int width = 24;
   int height = num_opts + 2;
@@ -1054,34 +1061,21 @@ int tui_run(const char *profile_name) {
         st.cmd_buf[0] = '\0';
         st.cmd_len = 0;
       } else if (ch == '\n' || ch == KEY_ENTER) {
+        char full_cmd[512];
         if (st.form_step == 0) {
-          strncpy(st.form_name, st.cmd_buf, sizeof(st.form_name) - 1);
-          st.cmd_buf[0] = '\0';
-          st.cmd_len = 0;
-          st.form_step = 1;
+          snprintf(full_cmd, sizeof(full_cmd), "edit \"%s\" --name \"%s\"", st.form_orig_name, st.cmd_buf);
         } else if (st.form_step == 1) {
-          strncpy(st.form_deadline, st.cmd_buf, sizeof(st.form_deadline) - 1);
-          st.cmd_buf[0] = '\0';
-          st.cmd_len = 0;
-          st.form_step = 2;
+          snprintf(full_cmd, sizeof(full_cmd), "edit \"%s\" --deadline %s", st.form_orig_name, st.cmd_buf);
         } else if (st.form_step == 2) {
-          int is_team = (strcasecmp(st.cmd_buf, "team") == 0 || strcasecmp(st.cmd_buf, "t") == 0 || strcasecmp(st.cmd_buf, "yes") == 0) ? 1 : 0;
-          const char *team_flag = is_team ? "--team" : "--solo";
-          char full_cmd[512];
-          if (st.form_is_edit) {
-            snprintf(full_cmd, sizeof(full_cmd),
-                     "edit \"%s\" --name \"%s\" --deadline %s %s",
-                     st.form_orig_name, st.form_name, st.form_deadline, team_flag);
-          } else {
-            snprintf(full_cmd, sizeof(full_cmd), "add \"%s\" --deadline %s %s",
-                     st.form_name, st.form_deadline, team_flag);
-          }
-          strncpy(st.cmd_buf, full_cmd, sizeof(st.cmd_buf) - 1);
-          st.cmd_len = strlen(st.cmd_buf);
-          execute_command(&st);
-          st.form_active = 0;
-          st.form_is_edit = 0;
+          snprintf(full_cmd, sizeof(full_cmd), "edit \"%s\" --prize \"%s\"", st.form_orig_name, st.cmd_buf);
+        } else if (st.form_step == 3) {
+          snprintf(full_cmd, sizeof(full_cmd), "edit \"%s\" --notes \"%s\"", st.form_orig_name, st.cmd_buf);
         }
+        strncpy(st.cmd_buf, full_cmd, sizeof(st.cmd_buf) - 1);
+        st.cmd_len = strlen(st.cmd_buf);
+        execute_command(&st);
+        st.form_active = 0;
+        st.form_is_edit = 0;
       } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
         if (st.cmd_len > 0)
           st.cmd_buf[--st.cmd_len] = '\0';
@@ -1108,9 +1102,9 @@ int tui_run(const char *profile_name) {
       if (ch == 27 || ch == 'q') {
         st.action_menu_active = 0;
       } else if (ch == KEY_DOWN || ch == 'j') {
-        st.action_selected = (st.action_selected + 1) % 5;
+        st.action_selected = (st.action_selected + 1) % 9;
       } else if (ch == KEY_UP || ch == 'k') {
-        st.action_selected = (st.action_selected + 4) % 5;
+        st.action_selected = (st.action_selected + 8) % 9;
       } else if (ch == '\n' || ch == KEY_ENTER) {
         st.action_menu_active = 0;
         const HackEntry *e = &st.log.entries[st.selected];
@@ -1123,16 +1117,29 @@ int tui_run(const char *profile_name) {
           st.cmd_len = strlen(st.cmd_buf);
           execute_command(&st);
         } else if (st.action_selected == 2) {
-          st.form_active = 1;
-          st.form_is_edit = 1;
-          st.form_step = 0;
-          strncpy(st.form_orig_name, e->name, sizeof(st.form_orig_name) - 1);
-          strncpy(st.cmd_buf, e->name, sizeof(st.cmd_buf) - 1);
-          st.cmd_len = strlen(st.cmd_buf);
-        } else if (st.action_selected == 3) {
           st.status_menu_active = 1;
           st.status_selected = 0;
-        } else if (st.action_selected == 4) {
+        } else if (st.action_selected >= 3 && st.action_selected <= 6) {
+          st.form_active = 1;
+          st.form_is_edit = 1;
+          st.form_step = st.action_selected - 3;
+          strncpy(st.form_orig_name, e->name, sizeof(st.form_orig_name) - 1);
+          if (st.form_step == 0) {
+            strncpy(st.cmd_buf, e->name, sizeof(st.cmd_buf) - 1);
+          } else if (st.form_step == 1) {
+            strncpy(st.cmd_buf, e->deadline, sizeof(st.cmd_buf) - 1);
+          } else if (st.form_step == 2) {
+             if (e->prize_amount > 0) snprintf(st.cmd_buf, sizeof(st.cmd_buf), "%s %.0f", e->prize_currency, e->prize_amount);
+             else st.cmd_buf[0] = '\0';
+          } else if (st.form_step == 3) {
+            strncpy(st.cmd_buf, e->notes, sizeof(st.cmd_buf) - 1);
+          }
+          st.cmd_len = strlen(st.cmd_buf);
+        } else if (st.action_selected == 7) {
+          snprintf(st.cmd_buf, sizeof(st.cmd_buf), "edit \"%s\" %s", e->name, e->is_team ? "--solo" : "--team");
+          st.cmd_len = strlen(st.cmd_buf);
+          execute_command(&st);
+        } else if (st.action_selected == 8) {
           snprintf(st.cmd_buf, sizeof(st.cmd_buf), "delete \"%s\"", e->name);
           st.cmd_len = strlen(st.cmd_buf);
           execute_command(&st);
