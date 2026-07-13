@@ -282,7 +282,7 @@ static int draw_stats(TuiState *st, int start_row) {
     }
   }
 
-  int x = 4;
+  int x = 2;
 
   attron(COLOR_PAIR(CP_ACCENT) | A_BOLD);
   mvprintw(row, x, " WIN RATE:");
@@ -290,14 +290,21 @@ static int draw_stats(TuiState *st, int start_row) {
   mvprintw(row, x + 13, "%s", wr_str);
   attroff(COLOR_PAIR(CP_ACCENT));
 
-  x = (cols / 3) + 2;
+  x = (cols / 4) + 2;
+  attron(COLOR_PAIR(CP_WON) | A_BOLD);
+  mvprintw(row, x, " TOTAL WON:");
+  attroff(A_BOLD);
+  mvprintw(row, x + 14, "%s", total_str);
+  attroff(COLOR_PAIR(CP_WON));
+
+  x = (2 * cols / 4) + 2;
   attron(COLOR_PAIR(CP_URGENT_RED) | A_BOLD);
   mvprintw(row, x, " STREAK:");
   attroff(A_BOLD);
   mvprintw(row, x + 11, "%s", streak_str);
   attroff(COLOR_PAIR(CP_URGENT_RED));
 
-  x = (2 * cols / 3) + 2;
+  x = (3 * cols / 4) + 2;
   attron(COLOR_PAIR(CP_ACTIVE_STATUS) | A_BOLD);
   mvprintw(row, x, " IN PROGRESS:");
   attroff(A_BOLD);
